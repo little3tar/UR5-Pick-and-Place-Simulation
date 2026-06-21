@@ -413,7 +413,7 @@ def process_image(rgb, depth):
 
     if a_show:
         cv.imshow("vision-results.png", img_draw)
-        cv.waitKey()
+        cv.waitKey(1)
 
     pass
 
@@ -426,7 +426,6 @@ def process_CB(image_rgb, image_depth):
     process_image(rgb, depth)
 
     print("Time:", time.time() - t_start)
-    rospy.signal_shutdown(0)
     pass
 
 #init node function

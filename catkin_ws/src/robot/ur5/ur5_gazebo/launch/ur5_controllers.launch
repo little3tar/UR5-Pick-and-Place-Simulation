@@ -10,10 +10,10 @@
   <rosparam file="$(find ur5_gazebo)/controller/ur5gripper_controllers.yaml"
             command="load" />
 
-  <!-- Load controllers -->
+  <!-- Load controllers: no-timeout waits indefinitely for controller_manager, fixes Gazebo timing race -->
   <node name="robot_controllers" pkg="controller_manager" type="spawner"
         output="$(arg DEBUG)"
-        args="joint_state_controller trajectory_controller gripper_controller"/>
+        args="--no-timeout joint_state_controller trajectory_controller gripper_controller"/>
 
   <!-- TF -->
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
