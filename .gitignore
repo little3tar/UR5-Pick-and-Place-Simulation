@@ -1,6 +1,23 @@
-devel
-build
-logs
-.vscode
-.catkin_tools
+# colcon
+build/
+install/
+log/
+devel/
+
+# python
 **/__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+
+# ide / os
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# ros
+.ros/
+*.bag
+*.db3
