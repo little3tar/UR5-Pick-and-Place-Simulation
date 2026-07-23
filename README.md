@@ -69,8 +69,8 @@ ros2 launch ur_simulation_gz ur_sim_control.launch.py ur_type:=ur5
 
 | Phase | 内容 | 状态 |
 |-------|------|------|
-| 0 | 目录/分支/骨架/官方 sim 冒烟 | 进行中 |
-| 1 | 场景 + 乐高 spawn | 待做 |
+| 0 | 目录/分支/骨架/官方 sim 冒烟 | 完成 |
+| 1 | 场景 + 乐高 spawn | 进行中 |
 | 2 | attach 服务 | 待做 |
 | 3 | MoveIt pick-place（真值位姿） | 待做 |
 | 4 | YOLO 视觉 | 待做 |

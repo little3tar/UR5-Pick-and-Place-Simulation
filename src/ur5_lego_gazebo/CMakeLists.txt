@@ -8,4 +8,9 @@ install(DIRECTORY models worlds launch
   OPTIONAL
 )
 
+install(PROGRAMS
+  scripts/level_manager.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
