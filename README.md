@@ -65,16 +65,16 @@ ros2 launch ur_simulation_gz ur_sim_control.launch.py ur_type:=ur5
 
 ## 迁移阶段
 
-详见 [docs/MIGRATION.md](docs/MIGRATION.md)。
+完整计划与进度见 **[docs/MIGRATION.md](docs/MIGRATION.md)**（决策、验收标准、命令、风险）。
 
-| Phase | 内容 | 状态 |
-|-------|------|------|
-| 0 | 目录/分支/骨架/官方 sim 冒烟 | 完成 |
-| 1 | 场景 + 乐高 spawn | 进行中 |
-| 2 | attach 服务 | 待做 |
-| 3 | MoveIt pick-place（真值位姿） | 待做 |
-| 4 | YOLO 视觉 | 待做 |
-| 5 | 全管道 / 城堡 | 待做 |
+| Phase | 内容 | 状态 | 备注 |
+|-------|------|------|------|
+| 0 | 目录/分支/骨架/官方 sim 冒烟 | **完成** | `ur_sim_control` 控制器激活 |
+| 1 | 场景 + 乐高 spawn | **进行中** | world/level_manager 已入库，待联调 |
+| 2 | attach 服务 | 待做 | gz-sim 重写 |
+| 3 | MoveIt pick-place（真值位姿） | 待做 | 弃用手写 IK |
+| 4 | YOLO 视觉 | 待做 | 常驻节点 |
+| 5 | 全管道 / 城堡 | 待做 | |
 
 ## 资源注意
 
