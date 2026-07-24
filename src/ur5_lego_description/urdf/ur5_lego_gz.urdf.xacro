@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!-- UR5 + simplified Robotiq 2F-85 on Lego table (Gazebo Harmonic).
+     Gripper joints are driven by gz JointPositionController plugins
+     (not ros2_control), because gz_ros2_control position→vel was not
+     moving the fingers in dartsim. -->
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="$(arg name)">
+  <xacro:arg name="name" default="ur"/>
+  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
+  <xacro:include filename="$(find ur_description)/urdf/inc/ur_joint_control.xacro"/>
+  <xacro:include filename="$(find robotiq_description)/urdf/ur_to_robotiq_adapter.urdf.xacro"/>
+  <xacro:include filename="$(find ur5_lego_description)/urdf/robotiq_2f_85_simple.urdf.xacro"/>
+
+  <xacro:arg name="ur_type" default="ur5"/>
+  <xacro:arg name="tf_prefix" default=""/>
+  <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/$(arg ur_type)/joint_limits.yaml"/>
+  <xacro:arg name="kinematics_params" default="$(find ur_description)/config/$(arg ur_type)/default_kinematics.yaml"/>
+  <xacro:arg name="physical_params" default="$(find ur_description)/config/$(arg ur_type)/physical_parameters.yaml"/>
+  <xacro:arg name="visual_params" default="$(find ur_description)/config/$(arg ur_type)/visual_parameters.yaml"/>
+  <xacro:arg name="transmission_hw_interface" default=""/>
+  <xacro:arg name="safety_limits" default="false"/>
+  <xacro:arg name="safety_pos_margin" default="0.15"/>
+  <xacro:arg name="safety_k_position" default="20"/>
+  <xacro:arg name="simulation_controllers" default=""/>
+  <xacro:arg name="ros_namespace" default=""/>
+  <xacro:arg name="base_xyz" default="0 0 0.72"/>
+  <xacro:arg name="base_rpy" default="0 0 0"/>
+  <xacro:arg name="with_gripper" default="true"/>
+
+  <link name="world"/>
+
+  <xacro:ur_robot
+    name="$(arg name)"
+    tf_prefix="$(arg tf_prefix)"
+    parent="world"
+    joint_limits_parameters_file="$(arg joint_limit_params)"
+    kinematics_parameters_file="$(arg kinematics_params)"
+    physical_parameters_file="$(arg physical_params)"
+    visual_parameters_file="$(arg visual_params)"
+    safety_limits="$(arg safety_limits)"
+    safety_pos_margin="$(arg safety_pos_margin)"
+    safety_k_position="$(arg safety_k_position)"
+    force_abs_paths="true"
+    >
+    <origin xyz="$(arg base_xyz)" rpy="$(arg base_rpy)"/>
+  </xacro:ur_robot>
+
+  <xacro:if value="$(arg with_gripper)">
+    <xacro:ur_to_robotiq prefix="$(arg tf_prefix)" connected_to="$(arg tf_prefix)tool0"/>
+    <xacro:robotiq_gripper_simple prefix="$(arg tf_prefix)" parent="$(arg tf_prefix)gripper_mount_link">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:robotiq_gripper_simple>
+  </xacro:if>
+
+  <!-- Arm only in ros2_control (gripper uses native gz plugins below) -->
+  <ros2_control name="$(arg name)" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <xacro:ur_joint_control_description tf_prefix="$(arg tf_prefix)"/>
+  </ros2_control>
+
+  <gazebo reference="world"/>
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(arg simulation_controllers)</parameters>
+      <position_proportional_gain>1.0</position_proportional_gain>
+      <hold_joints>true</hold_joints>
+      <ros>
+        <namespace>$(arg ros_namespace)</namespace>
+      </ros>
+    </plugin>
+  </gazebo>
+
+  <!-- Native Gazebo joint position PID (prismatic needs high force gains) -->
+  <xacro:if value="$(arg with_gripper)">
+    <gazebo>
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>$(arg tf_prefix)robotiq_85_left_knuckle_joint</joint_name>
+        <topic>gripper_left_cmd</topic>
+        <initial_position>0.04</initial_position>
+        <p_gain>2000</p_gain>
+        <i_gain>10</i_gain>
+        <d_gain>50</d_gain>
+        <i_max>50</i_max>
+        <i_min>-50</i_min>
+        <cmd_max>200</cmd_max>
+        <cmd_min>-200</cmd_min>
+      </plugin>
+      <plugin filename="gz-sim-joint-position-controller-system"
+              name="gz::sim::systems::JointPositionController">
+        <joint_name>$(arg tf_prefix)robotiq_85_right_knuckle_joint</joint_name>
+        <topic>gripper_right_cmd</topic>
+        <initial_position>0.04</initial_position>
+        <p_gain>2000</p_gain>
+        <i_gain>10</i_gain>
+        <d_gain>50</d_gain>
+        <i_max>50</i_max>
+        <i_min>-50</i_min>
+        <cmd_max>200</cmd_max>
+        <cmd_min>-200</cmd_min>
+      </plugin>
+    </gazebo>
+  </xacro:if>
+</robot>

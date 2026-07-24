@@ -1,15 +1,24 @@
 <?xml version="1.0" ?>
-<sdf version="1.5">
+<sdf version="1.9">
   <model name="kinect">
+    <static>true</static>
     <pose>0 0 0.036 0 0 0</pose>
     <link name="link">
       <inertial>
         <mass>0.1</mass>
+        <inertia>
+          <ixx>0.001</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.001</iyy>
+          <iyz>0</iyz>
+          <izz>0.001</izz>
+        </inertia>
       </inertial>
       <collision name="collision">
         <geometry>
           <box>
-            <size>0.073000 0.276000 0.072000</size>
+            <size>0.073 0.276 0.072</size>
           </box>
         </geometry>
       </collision>
@@ -20,9 +29,13 @@
           </mesh>
         </geometry>
       </visual>
-      <sensor name="camera" type="depth">
+      <!-- Camera sensor only; ROS bridge comes in Phase 4 (no Classic plugin) -->
+      <sensor name="camera" type="camera">
+        <pose>0 0 0 0 0 0</pose>
+        <always_on>true</always_on>
         <update_rate>20</update_rate>
-        <camera>
+        <visualize>false</visualize>
+        <camera name="kinect_rgb">
           <horizontal_fov>1.047198</horizontal_fov>
           <image>
             <width>640</width>
@@ -34,30 +47,6 @@
             <far>3</far>
           </clip>
         </camera>
-        <plugin name="camera_plugin" filename="libgazebo_ros_openni_kinect.so">
-          <baseline>0.2</baseline>
-          <alwaysOn>true</alwaysOn>
-          <updateRate>0.0</updateRate>
-          <cameraName>camera_ir</cameraName>
-          <imageTopicName>/camera/color/image_raw</imageTopicName>
-          <cameraInfoTopicName>/camera/color/camera_info</cameraInfoTopicName>
-          <depthImageTopicName>/camera/depth/image_raw</depthImageTopicName>
-          <depthImageCameraInfoTopicName>/camera/depth/camera_info</depthImageCameraInfoTopicName>
-          <pointCloudTopicName>/camera/depth/points</pointCloudTopicName>
-          <frameName>camera_link</frameName>
-          <pointCloudCutoff>0.5</pointCloudCutoff>
-          <pointCloudCutoffMax>3.0</pointCloudCutoffMax>
-          <distortionK1>0</distortionK1>
-          <distortionK2>0</distortionK2>
-          <distortionK3>0</distortionK3>
-          <distortionT1>0</distortionT1>
-          <distortionT2>0</distortionT2>
-          <CxPrime>0</CxPrime>
-          <Cx>0</Cx>
-          <Cy>0</Cy>
-          <focalLength>0</focalLength>
-          <hackBaseline>0</hackBaseline>
-        </plugin>
       </sensor>
     </link>
   </model>

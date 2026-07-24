@@ -21,5 +21,10 @@ setup(
     description='Launch files for UR5 Lego simulation',
     license='MIT',
     extras_require={'test': ['pytest']},
-    entry_points={'console_scripts': []},
+    entry_points={
+        'console_scripts': [
+            'gripper_test = ur5_lego_bringup.gripper_test:main',
+            'attach_demo = ur5_lego_bringup.attach_demo:main',
+        ],
+    },
 )

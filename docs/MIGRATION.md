@@ -1,6 +1,6 @@
 # ROS 1 → ROS 2 Jazzy 迁移计划与进度
 
-> 最后更新：2026-07-24  
+> 最后更新：2026-07-24（会话末进度快照）  
 > 分支：`ros2-jazzy`  
 > 工作区：`~/ros2/ur5_lego`  
 > 参考（只读）：`~/ros2/ref/UR5-Pick-and-Place-Simulation`（`main` / ROS1）
@@ -13,10 +13,10 @@
 |----|------|
 | 原项目 | UR5 + Robotiq + Kinect + YOLOv5 乐高抓取（ROS **Noetic** + Gazebo **Classic 11** + catkin） |
 | 本机环境 | **WSL2 Ubuntu 24.04** + **ROS 2 Jazzy** + Gazebo **Harmonic**（`ros_gz`） |
-| 为何迁移 | Noetic 不支持 24.04；本机已装 Jazzy，不能直接 `gh clone` 后运行 ROS1 栈 |
-| 目标 | 在 Jazzy + gz-sim 上重建：仿真世界 → 乐高 spawn → 附着抓取 → MoveIt 抓放 → YOLO → 全管道 |
+| 为何迁移 | Noetic 不支持 24.04；本机已装 Jazzy |
+| 目标 | 仿真世界 → 乐高 spawn → 附着抓取 → MoveIt 抓放 → YOLO → 全管道 |
 
-**策略**：不原样移植 catkin；**官方栈替换厂商包**，只迁移业务逻辑与资产（mesh / weights / 关卡参数）。
+**策略**：不原样移植 catkin；**官方栈替换厂商包**，只迁移业务逻辑与资产。
 
 ---
 
@@ -24,207 +24,196 @@
 
 | 项 | 选择 |
 |----|------|
-| 系统 | Ubuntu 24.04 WSL2（现环境） |
 | 中间件 | ROS 2 Jazzy |
 | 仿真 | Gazebo Harmonic（`ros_gz_sim` / `ros_gz_bridge`） |
-| 机械臂 | apt：`ur_description`、`ur_simulation_gz`（**不** vendoring ROS1 `universal_robot`） |
-| 夹爪 | apt：`robotiq_description`、`robotiq_controllers` |
-| 规划 | MoveIt 2；**弃用**原 `kinematics.py` 手写 IK |
-| Git | 同 fork `little3tar/UR5-Pick-and-Place-Simulation`，分支 **`ros2-jazzy`**（`main` 保留 ROS1） |
-| 目录 | `~/ros2/` = 所有 ROS2 项目父目录；本项目 = `~/ros2/ur5_lego`（独立 colcon 工作区） |
+| 机械臂 | apt：`ur_description`、`ur_simulation_gz` |
+| 夹爪 | 官方 mesh + **简化平行 prismatic**（非完整 2F-85 四杆/mimic） |
+| 抓取 | 对齐原项目思路：**attach 粘合**，非指尖摩擦；当前为 **static 代理 + TF sticky** |
+| 规划 | MoveIt 2（**未做**）；弃用手写 IK |
+| 目录 | `~/ros2/ur5_lego` 独立 colcon 工作区 |
 
 ### 明确不做
 
-- 在 24.04 上硬装 Noetic  
-- 把 `catkin_ws` 当 ament 包编译  
-- 在 `~/ros2` **根**执行 `colcon build` 混编多项目  
+- 24.04 上硬装 Noetic  
+- 把 `catkin_ws` 当 ament 编译  
+- 在 `~/ros2` **根** `colcon build`  
 
 ---
 
-## 3. 包映射
+## 3. 包状态
 
-| ROS1 | ROS2 包 | 说明 |
-|------|---------|------|
-| levelManager | `ur5_lego_gazebo` + `ur5_lego_bringup` | world、spawn、launch |
-| vision | `ur5_lego_vision` | YOLO 节点（待实现） |
-| motion_planning | `ur5_lego_motion` | pick-place（待实现） |
-| build_planning | （后期并入 motion 或独立包） | 城堡蓝图 |
-| gazebo_ros_link_attacher | `ur5_lego_attach` | gz-sim 下重写 |
-| robot/* / universal_robot / robotiq vendor | 系统 apt | 删除 vendored 拷贝 |
-| （新） | `ur5_lego_msgs` | LegoDetection*、Attach/Detach/SetStatic |
-| （新） | `ur5_lego_description` | 场景/组合 URDF 占位 |
+| 包 | 状态 | 说明 |
+|----|------|------|
+| `ur5_lego_msgs` | **可用** | LegoDetection*、Attach/Detach/SetStatic |
+| `ur5_lego_gazebo` | **可用** | world、level_manager、乐高/场景模型（box collision） |
+| `ur5_lego_description` | **可用** | `ur5_lego_gz.urdf.xacro`、简化夹爪、控制器 yaml |
+| `ur5_lego_bringup` | **可用** | `sim_smoke` / `lego_world` / **`sim_lego`**；`gripper_test` / `attach_demo` |
+| `ur5_lego_attach` | **MVP 可用** | static-proxy sticky attach/detach |
+| `ur5_lego_motion` | 空壳 | 待 MoveIt pick-place |
+| `ur5_lego_vision` | 空壳+weights | 待 YOLO 节点 |
 
 ---
 
-## 4. 阶段计划与进度
+## 4. 阶段进度（当前）
 
-| Phase | 内容 | 状态 | 验收标准 |
-|-------|------|------|----------|
-| **0** | 目录布局、分支、ament 骨架、apt 依赖、官方 UR sim 冒烟 | **完成** | `ur_sim_control` 起控制器 |
-| **1** | 乐高场景 SDF、level_manager spawn、resource path | **进行中** | world + 积木可 spawn |
-| **2** | attach/detach/setStatic（gz-sim） | 待做 | 积木随夹爪 / 可释放 |
-| **3** | MoveIt2 pick-place（仿真真值位姿 MVP） | 待做 | level1 A→home |
-| **4** | YOLO 视觉常驻节点 | 待做 | `/lego_detections` 稳定 |
-| **5** | 全管道 + 城堡 / 文档收尾 | 待做 | level2–4 演示 |
+| Phase | 内容 | 状态 | 验收 |
+|-------|------|------|------|
+| **0** | 布局/分支/骨架/官方 UR 冒烟 | **完成** | 控制器 activate |
+| **1** | 乐高场景 + spawn + UR 同世界 | **完成** | 11 砖稳定；`sim_lego` 起臂+桌 |
+| **2** | 夹爪开合 + attach/detach | **完成** | 开合 OK；static-proxy attach 复测通过 |
+| **3** | MoveIt2 真值抓放 | 待做 | level1 A→home |
+| **4** | YOLO 常驻 | 待做 | `/lego_detections` |
+| **5** | 全管道 / 城堡 | 待做 | level2–4 |
 
-### MVP 推荐顺序
+### 步骤完成度（会话内）
 
 ```text
-① 官方 ur_simulation_gz          ← Phase 0 已过
-② 自己的 world + 桌子 + spawn 乐高  ← Phase 1
-③ MoveIt 点到点 + 夹爪
-④ attach 最小实现
-⑤ 真值位姿 pick-place（无视觉）
-⑥ YOLO 接入
-⑦ 多积木 / 城堡
+✅ Step A–D  lego_world + level_manager + SDF/box collision 修复
+✅ Step E    UR5 + 乐高同世界（sim_lego）
+✅ Step F    简化夹爪开合（gz JointPositionController + bridge）
+✅ Step G    attach MVP（static-proxy：不闪、不乱飞、detach 下落）
+⬜ Step H    MoveIt 点到点 / 真值 pick-place
+⬜ Step I–J  YOLO / 全管道
 ```
 
 ---
 
-## 5. Phase 0 完成记录（2026-07-24）
-
-### 5.1 布局
-
-```text
-~/ros2/
-├── README.md
-├── ref/UR5-Pick-and-Place-Simulation/   # ROS1 参考 main
-└── ur5_lego/                            # colcon 工作区，分支 ros2-jazzy
-    ├── src/ur5_lego_{msgs,description,gazebo,bringup,vision,motion,attach}/
-    ├── docs/MIGRATION.md
-    ├── build/ install/ log/
-    └── README.md
-```
-
-### 5.2 已安装 apt（节选）
-
-- `ros-jazzy-ur` / `ur-simulation-gz` / `ur-moveit-config`
-- `ros-jazzy-robotiq-description` / `robotiq-controllers`
-- `ros-jazzy-moveit`、`ros-gz`、`cv-bridge`
-- `controller-manager`、`joint-trajectory-controller` 等
-
-### 5.3 冒烟命令与结果
-
-```bash
-source /opt/ros/jazzy/setup.bash
-ros2 launch ur_simulation_gz ur_sim_control.launch.py \
-  ur_type:=ur5 gazebo_gui:=false launch_rviz:=false
-```
-
-**结果：通过**
-
-- Gazebo Harmonic 启动，`world/empty` 初始化  
-- 硬件接口 `ur` activate  
-- `scaled_joint_trajectory_controller`、`joint_state_broadcaster` 配置并激活  
-- spawner 正常退出  
-
-有界面时可加 `gazebo_gui:=true` / 默认 RViz。
-
-### 5.4 Git
-
-| 提交 | 说明 |
-|------|------|
-| `0dbcee9` | bootstrap：去掉 catkin、7 个 ament 包、资产、msgs、smoke launch |
-| `c64b855` | Phase1 骨架：world SDF、level_manager、lego_world launch |
-
-远程：`origin/ros2-jazzy`  
-`main` 未改，仍为 ROS1。
-
----
-
-## 6. Phase 1 进度（进行中）
-
-### 已有
-
-| 文件 | 作用 |
-|------|------|
-| `ur5_lego_gazebo/worlds/main_scene.sdf` | Harmonic 世界（桌/基座/Kinect include，无 Classic 插件） |
-| `ur5_lego_gazebo/scripts/level_manager.py` | rclpy 关卡 spawn（`ros_gz_sim create`） |
-| `ur5_lego_gazebo/launch/lego_world.launch.py` | 设 `GZ_SIM_RESOURCE_PATH` + 启 gz |
-| `ur5_lego_bringup/launch/lego_world.launch.py` | 转发 gazebo launch |
-| `models/lego/*`、`models/scene/*` | 自 ROS1 迁入的 mesh/sdf |
-
-### 待完成（Phase 1 收尾）
-
-- [ ] 实测 `lego_world`：场景模型在 Harmonic 下能否解析（Classic SDF/material 可能要改）  
-- [ ] 实测 `level_manager -l 1/2` spawn  
-- [ ] 与官方 UR 同进程/同 world 组合（当前冒烟 world 为 `empty`，乐高 world 为 `ur5_world`）  
-- [ ] 必要时改 mesh collision / material 以适配 gz-sim  
-- [ ] bridge（相机/时钟）预留  
-
-### 试用命令（Phase 1 自测）
+## 5. 主入口与自测命令
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/ros2/ur5_lego/install/setup.bash
+cd ~/ros2/ur5_lego && colcon build --symlink-install   # 有改动时
 
-# 仅乐高场景
+# 主仿真：UR5 + 夹爪 + 乐高 world + attach 节点
+ros2 launch ur5_lego_bringup sim_lego.launch.py ur_type:=ur5
+
+# 夹爪开合（0=合，0.04=开，单位 m）
+ros2 run ur5_lego_bringup gripper_test
+
+# 一键：固定桌面 spawn + snap attach + 保持 + detach
+ros2 run ur5_lego_bringup attach_demo -- --spawn --hold 15
+
+# 仅场景 / 关卡
 ros2 launch ur5_lego_bringup lego_world.launch.py
-
-# 另开终端：生成关卡（需 sim 已起）
-ros2 run ur5_lego_gazebo level_manager.py -l 1
-# 或 -l 2 全部 11 类
+ros2 run ur5_lego_gazebo level_manager.py -l 1   # 或 -l 2
 ```
 
----
+### 关键文件
 
-## 7. 已迁入资产
-
-- 乐高 models → `src/ur5_lego_gazebo/models/lego/`  
-- 场景 models → `src/ur5_lego_gazebo/models/scene/`  
-- YOLO weights → `src/ur5_lego_vision/weights/`（`best.pt` / `depth.pt` / `orientation.pt`，体积较大）  
-- 接口 → `ur5_lego_msgs`：`LegoDetection`、`LegoDetectionArray`、`Attach`、`Detach`、`SetStatic`  
-- ROS1 msg 备份 → `docs/Lego_state.msg.ros1`  
-
----
-
-## 8. 已知风险与资源
-
-| 风险 | 缓解 |
+| 路径 | 作用 |
 |------|------|
-| Classic SDF / `Gazebo/*` material 在 Harmonic 失效 | 改 material 为 PBR/简单 diffuse；逐模型验证 |
-| `gazebo_ros_link_attacher` 无法复用 | Phase 2 自研 gz system 或简化“粘 TF” MVP |
-| 自定义 IK 发散 | 不迁，用 MoveIt2 |
-| vision 单帧 shutdown | ROS2 节点常驻设计 |
-| 内存 ~7.6G / 显存 ~2G | `gazebo_gui:=false`；YOLO 默认 CPU |
-| YOLO 权重 >50MB GitHub 警告 | 后续可考虑 Git LFS 或外链 |
+| `ur5_lego_bringup/launch/sim_lego.launch.py` | 一键：gz + UR + 夹爪 bridge + attach |
+| `ur5_lego_description/urdf/ur5_lego_gz.urdf.xacro` | 臂 + 简化夹爪 + gz 插件 |
+| `ur5_lego_description/urdf/robotiq_2f_85_simple.urdf.xacro` | 左右 **prismatic** 平行指 |
+| `ur5_lego_description/config/ur_lego_controllers.yaml` | 臂轨迹控制器（夹爪不走 ros2_control） |
+| `ur5_lego_attach/.../attach_node.py` | attach/detach 服务 |
+| `ur5_lego_gazebo/scripts/level_manager.py` | 关卡 spawn |
+| `ur5_lego_gazebo/worlds/main_scene.sdf` | 桌/基座/Kinect |
 
 ---
 
-## 9. 日常命令速查
+## 6. 技术结论（已踩坑）
 
-```bash
-# 环境
-source /opt/ros/jazzy/setup.bash
-source ~/ros2/ur5_lego/install/setup.bash
+### 场景 / 积木
 
-# 编译
-cd ~/ros2/ur5_lego && colcon build --symlink-install
+| 问题 | 处理 |
+|------|------|
+| inertial `<pose>` 仅 3 个数 | 补成 6 元组 |
+| mesh collision → ODE trimesh 崩溃 | 全改 **box collision** |
+| Classic Kinect 插件 | 去掉 `libgazebo_ros_openni_kinect`，保留简易 camera |
+| table visual 内非法 light | 删除 |
+| 纹理 `working area.png` | 改名为 `working_area.png` |
+| 砖质量 ~1e-5 kg 几乎不掉 | 统一约 **0.02 kg** |
 
-# Phase 0 官方冒烟
-ros2 launch ur_simulation_gz ur_sim_control.launch.py ur_type:=ur5
+### 夹爪
 
-# 本仓库 smoke 入口（包装官方 launch）
-ros2 launch ur5_lego_bringup sim_smoke.launch.py ur_type:=ur5
+| 问题 | 处理 |
+|------|------|
+| dartsim **不支持 mimic** | 不用官方完整 2F-85 联动 |
+| ros2_control 位置指令指关节不动 | 改用 **gz JointPositionController** + `/gripper_*_cmd` bridge |
+| prismatic 开合慢 | `p_gain` 提到 ~2000，`initial_position=0.04` |
+| 完整四杆 vs 简化 | **默认平行 prismatic**（抓取够用）；revolute 仅试过 |
+
+### Attach（对齐原项目语义）
+
+原 ROS1：**合爪动画 + `gazebo_ros_link_attacher` 创建 fixed joint**（非摩擦抓取）。
+
+| 尝试 | 结果 |
+|------|------|
+| 动态砖 + 低频 set_pose | 重力导致闪现掉落 |
+| 动态砖 + 100Hz set_pose | 与物理/碰撞冲突 → 乱飞 |
+| disable_collision（MODEL/LINK） | 服务要求 **COLLISION** 类型，易失败 |
+| **static 代理 + set_pose**（当前） | 粘住稳定；detach 重生动态砖应可下落 |
+
+当前 attach 流程：
+
+```text
+attach: remove 动态砖 → spawn static 代理 `名字__held` → TF sticky set_pose
+detach: remove 代理 → spawn 动态砖（略低）→ 重力下落
 ```
 
----
-
-## 10. 下一步（按优先级）
-
-1. **Phase 1 收尾**：跑通 `lego_world` + `level_manager`，修 SDF/路径问题  
-2. **组合 UR5 + 乐高场景**（同一 gz world）  
-3. **Phase 2**：attach 最小可用实现  
-4. **Phase 3**：MoveIt 真值抓放 MVP（无视觉）  
-5. Phase 4–5：YOLO 与全管道  
+服务：`/attach` `/detach` `/setstatic`（setstatic 仍为 MVP 确认）。
 
 ---
 
-## 11. 变更日志（迁移相关）
+## 7. 原项目抓取对照
+
+| | ROS1 | 本仓库 ROS2 |
+|--|------|-------------|
+| 合爪 | gripper action | `/gripper_left_cmd` `/gripper_right_cmd` |
+| 粘住 | Classic **fixed joint** 插件 | **static 代理 + set_pose** |
+| 粘着 link | `wrist_3_link` | TF `robotiq_85_base_link` |
+| 放置固定 | attach ground + setstatic | 未完整复刻 |
+
+---
+
+## 8. 已知风险 / 待办
+
+| 项 | 说明 |
+|----|------|
+| attach static-proxy | **2026-07-24 复测通过**（`attach_demo --spawn --hold 15`） |
+| 相机 bridge | Kinect 仅占位；YOLO 前要 gz 相机 + ros_gz_bridge |
+| MoveIt | 未接；臂仅有 trajectory controller |
+| 真机式固定关节 | Harmonic 无等价 ros 插件；长期可评估 DetachableJoint / 自定义 system |
+| 内存 ~8G | 默认 `launch_rviz:=false`；可 `gazebo_gui:=false` |
+| 未提交改动 | 大量本地修改（attach/夹爪/SDF），尚未 commit/push |
+
+---
+
+## 9. 下一步（优先级）
+
+1. **Phase 3**：MoveIt 点到点 → 真值位姿接近 → attach → 抬起  
+2. 可选：放置 setstatic / 固定到桌面  
+3. Phase 4：相机 bridge + YOLO 常驻  
+4. Phase 5：多关卡 / 城堡 / 文档收尾  
+5. 建议 **git commit**（拆：gazebo 资产 / description+夹爪 / attach / docs）
+
+---
+
+## 10. 变更日志（迁移）
 
 | 日期 | 内容 |
 |------|------|
-| 2026-07-24 | 定方案 C（ROS2 长期迁移）；`~/ros2` 多项目布局；clone ref + `ur5_lego` |
-| 2026-07-24 | 分支 `ros2-jazzy`；7 包骨架；资产迁入；msgs；colcon 通过 |
-| 2026-07-24 | apt 安装 UR/MoveIt/robotiq/ros-gz；`ur_sim_control` 冒烟通过 |
-| 2026-07-24 | Phase1：`main_scene.sdf`、`level_manager.py`、launch；文档本页 |
+| 2026-07-24 | 方案 C；`~/ros2` 布局；分支 `ros2-jazzy`；7 包骨架 |
+| 2026-07-24 | Phase0 冒烟；Phase1 world/level_manager |
+| 2026-07-24 | Phase1 实测：pose/box collision/Kinect/纹理修复；11 砖稳定 |
+| 2026-07-24 | Step E：`sim_lego` UR+乐高同世界 |
+| 2026-07-24 | Step F：简化夹爪 + gz JointPositionController 开合通过 |
+| 2026-07-24 | Step G：attach MVP；迭代 sticky → static-proxy；砖质量 0.02kg |
+| 2026-07-24 | Phase2 复测通过：`attach_demo --spawn --hold 15` 稳定粘合、detach 下落 |
+
+---
+
+## 11. 日常命令速查
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ~/ros2/ur5_lego/install/setup.bash
+cd ~/ros2/ur5_lego && colcon build --symlink-install
+
+ros2 launch ur5_lego_bringup sim_lego.launch.py ur_type:=ur5
+ros2 run ur5_lego_bringup gripper_test
+ros2 run ur5_lego_bringup attach_demo -- --spawn --hold 15
+ros2 run ur5_lego_gazebo level_manager.py -l 2
+```

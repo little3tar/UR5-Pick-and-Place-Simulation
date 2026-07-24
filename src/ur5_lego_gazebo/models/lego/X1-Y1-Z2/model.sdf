@@ -1,19 +1,19 @@
 <?xml version="1.0"?>
-<sdf version="1.4">
+<sdf version="1.7">
   <model name="X1-Y1-Z2">
     <static>false</static>
     <link name="link">
       <pose>0 0 0 0 0 0</pose>
       <inertial>
         <pose>0 0 -0.064e-02 0 0 0</pose>
-        <mass>7.975e-6</mass>
+        <mass>0.02</mass>
         <inertia>
-          <ixx>31.065e-10</ixx>
-          <ixy>0.000027e-10</ixy>
-          <ixz>-0.002403e-10</ixz>
-          <iyy>31.066e-10</iyy>
-          <iyz>-0.000221e-10</iyz>
-          <izz>19.7979e-10</izz>
+          <ixx>2e-06</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>2e-06</iyy>
+          <iyz>0</iyz>
+          <izz>2e-06</izz>
         </inertia>
       </inertial>
       
@@ -24,18 +24,17 @@
           </mesh>
         </geometry>
         <material>
-          <script>
-            <uri>file://media/materials/scripts/gazebo.material</uri>
-            <name>Gazebo/Red</name>
-          </script>
+          <ambient>0.8 0.1 0.1 1</ambient>
+          <diffuse>0.9 0.15 0.15 1</diffuse>
+          <specular>0.1 0.1 0.1 1</specular>
         </material>
       </visual>
       
       <collision name="collision">
         <geometry>
-          <mesh>
-            <uri>model://X1-Y1-Z2/meshes/X1-Y1-Z2.stl</uri>
-          </mesh>
+          <box>
+            <size>0.031 0.031 0.057</size>
+          </box>
         </geometry>
       </collision>
     </link>

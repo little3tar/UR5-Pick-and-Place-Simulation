@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<!--
+  Simplified Robotiq-style parallel gripper for Gazebo Harmonic (dartsim).
+  - Left/right prismatic fingers (no mimic / continuous joints)
+  - Driven by gz JointPositionController topics
+  - 0.0 = closed, 0.04 = open (meters each side)
+-->
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+  <xacro:macro name="robotiq_gripper_simple" params="prefix parent *origin">
+    <xacro:property name="mesh_v" value="file://$(find robotiq_description)/meshes/visual"/>
+
+    <link name="${prefix}robotiq_85_base_link">
+      <visual>
+        <geometry>
+          <mesh filename="${mesh_v}/robotiq_base.dae"/>
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.05" rpy="0 0 0"/>
+        <geometry><box size="0.10 0.06 0.10"/></geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 0.04" rpy="0 0 0"/>
+        <mass value="0.5"/>
+        <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
+
+    <link name="${prefix}robotiq_85_left_finger_link">
+      <visual>
+        <geometry>
+          <mesh filename="${mesh_v}/left_knuckle.dae"/>
+        </geometry>
+      </visual>
+      <visual>
+        <origin xyz="0.0315 0 -0.004" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_v}/left_finger.dae"/>
+        </geometry>
+      </visual>
+      <visual>
+        <origin xyz="0.037 0 0.043" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_v}/left_finger_tip.dae"/>
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0.025 0 0.04" rpy="0 0 0"/>
+        <geometry><box size="0.03 0.018 0.08"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.08"/>
+        <inertia ixx="1e-4" iyy="1e-4" izz="1e-4" ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
+
+    <link name="${prefix}robotiq_85_right_finger_link">
+      <visual>
+        <geometry>
+          <mesh filename="${mesh_v}/right_knuckle.dae"/>
+        </geometry>
+      </visual>
+      <visual>
+        <origin xyz="-0.0315 0 -0.004" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_v}/right_finger.dae"/>
+        </geometry>
+      </visual>
+      <visual>
+        <origin xyz="-0.037 0 0.043" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="${mesh_v}/right_finger_tip.dae"/>
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="-0.025 0 0.04" rpy="0 0 0"/>
+        <geometry><box size="0.03 0.018 0.08"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.08"/>
+        <inertia ixx="1e-4" iyy="1e-4" izz="1e-4" ixy="0" ixz="0" iyz="0"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}robotiq_85_base_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}robotiq_85_base_link"/>
+      <xacro:insert_block name="origin"/>
+    </joint>
+
+    <joint name="${prefix}robotiq_85_left_knuckle_joint" type="prismatic">
+      <parent link="${prefix}robotiq_85_base_link"/>
+      <child link="${prefix}robotiq_85_left_finger_link"/>
+      <origin xyz="0.012 0 0.055" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="0.0" upper="0.04" velocity="0.15" effort="80"/>
+      <dynamics damping="5.0" friction="0.5"/>
+    </joint>
+    <joint name="${prefix}robotiq_85_right_knuckle_joint" type="prismatic">
+      <parent link="${prefix}robotiq_85_base_link"/>
+      <child link="${prefix}robotiq_85_right_finger_link"/>
+      <origin xyz="-0.012 0 0.055" rpy="0 0 0"/>
+      <axis xyz="-1 0 0"/>
+      <limit lower="0.0" upper="0.04" velocity="0.15" effort="80"/>
+      <dynamics damping="5.0" friction="0.5"/>
+    </joint>
+  </xacro:macro>
+</robot>
