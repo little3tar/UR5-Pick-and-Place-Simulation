@@ -155,20 +155,123 @@ detach: remove 代理 → spawn 动态砖（略低）→ 重力下落
 
 服务：`/attach` `/detach` `/setstatic`（setstatic 仍为 MVP 确认）。
 
+### 砖粘在夹爪「下方」是设计，不是故障
+
+| 项 | 说明 |
+|----|------|
+| 现象 | attach 后砖停在夹爪下方约 `snap_offset_z`（默认 **0.12 m**，世界 −Z），而不是两指中间 |
+| 原因 | MVP 用 **snap 到固定偏移** + static 代理，避免指尖穿模、乱飞；合爪主要是视觉 |
+| 与真抓区别 | 真夹爪：砖在指缝间；当前：像吊在腕/夹爪下方的粘合点 |
+| 与原 ROS1 | 同为 **attach 粘合**（非摩擦）；原为 fixed joint 粘 `wrist_3_link`，现为 sticky 跟 `robotiq_85_base_link` |
+| 参数 | `ur5_lego_attach` / launch：`snap_offset_z`、`mode:=snap\|relative` |
+| 后续可改 | MoveIt 接近后再 attach；或改相对指尖 TF / 减小偏移，使更像夹在中间 |
+
+**不要**在未改需求前把「砖在下方」当成 bug 去修。
+
 ---
 
-## 7. 原项目抓取对照
+## 7. 新对话必读：设计约定（勿当 bug）
+
+> 另开对话时**没有**本会话聊天记录。以下约定必须遵守，除非用户明确要求改设计。
+
+### 7.1 目录与构建
+
+| 约定 | 说明 |
+|------|------|
+| 工作区 | **只在** `~/ros2/ur5_lego` 执行 `colcon build` |
+| 禁止 | `~/ros2` 根目录 colcon；不要编译 `ref/` 里的 ROS1 catkin |
+| 分支 | 迁移开发在 **`ros2-jazzy`**；`main` 保留 ROS1 |
+| 参考 | `~/ros2/ref/UR5-Pick-and-Place-Simulation` **只读** |
+| 环境 | 先 `source /opt/ros/jazzy/setup.bash` 再 `source install/setup.bash` |
+
+### 7.2 主入口与默认参数
+
+| 项 | 值 |
+|----|-----|
+| 主 launch | `ros2 launch ur5_lego_bringup sim_lego.launch.py ur_type:=ur5` |
+| 默认 RViz | **`launch_rviz:=false`**（省内存） |
+| 无头仿真 | `gazebo_gui:=false` 可用 |
+| 臂基座高度 | xacro `base_xyz` 默认 **`0 0 0.72`**（桌面附近，可微调） |
+| 世界名 | **`ur5_world`**（与 `level_manager --world` 一致） |
+| 机器人 gz 名 | spawn 名 **`ur`** |
+
+`sim_lego.launch.py` 是**自建完整 launch**（含 `ParameterValue(..., value_type=str)`），**不要**改回单纯 Include 官方 `ur_sim_control` 而不处理长 URDF：否则会报 `Unable to parse robot_description as yaml`。
+
+### 7.3 夹爪（简化平行指）
+
+| 约定 | 说明 |
+|------|------|
+| 模型 | `robotiq_2f_85_simple.urdf.xacro`：**prismatic** 左右指，**非**官方完整 2F-85 四杆 |
+| 为何不用完整版 | dartsim **不支持 URDF mimic**；continuous 关节会乱飞 |
+| 驱动 | **不走** ros2_control 夹爪控制器；用 gz **`JointPositionController`** |
+| 话题 | `/gripper_left_cmd`、`/gripper_right_cmd`（`std_msgs/Float64`） |
+| 单位 | **米**；**0.0=合，0.04=开**（两侧同号同值，不是 ±rad） |
+| 测试 | `ros2 run ur5_lego_bringup gripper_test` |
+| 合爪含义 | **主要是视觉**；真正「抓住」靠 **attach**，不是摩擦 |
+
+**不要**在未评估 mimic/物理前改回官方 `robotiq_2f_85_macro` 当仿真主路径。
+
+### 7.4 积木 / 场景模型
+
+| 约定 | 说明 |
+|------|------|
+| 碰撞 | 乐高用 **box collision**，**不要**改回 mesh collision（会 ODE trimesh 崩溃） |
+| 质量 | 约 **0.02 kg**（太小会 detach 不掉落） |
+| inertial pose | 必须 **6 个数**（xyz + rpy） |
+| Kinect | 无 Classic 插件；**相机未做 ROS bridge**（YOLO 前再接） |
+| 桌面纹理 | 文件名 `working_area.png`（无空格） |
+| level_manager 随机区 | `SPAWN_POS≈(-0.35,-0.42,0.74)` 一带；可能偏视野外 |
+| attach_demo spawn | 固定可见点 **`(0.25, -0.35, 0.78)`**，砖类型默认 `X1-Y1-Z2` |
+
+### 7.5 Attach / Detach 接口与语义
+
+| 约定 | 说明 |
+|------|------|
+| 服务 | `/attach`、`/detach`、`/setstatic`（`ur5_lego_msgs`） |
+| 抓取语义 | 与 ROS1 相同：**粘合**，非物理夹紧 |
+| attach 实现 | 删动态砖 → 生成 **static** 代理 **`{原名}__held`** → TF sticky `set_pose` |
+| detach 实现 | 删代理 → 在略低处重生 **动态** 原名 → 应下落 |
+| 默认 parent TF | **`robotiq_85_base_link`**（参数 `default_parent_frame`） |
+| 请求字段习惯 | `model_name_2` = **砖在 gz 中的名字**；`link_name_1` = **夹爪 TF 帧** |
+| 默认 mode | **`snap`**：吸附到夹爪**世界坐标下方** `snap_offset_z`（默认 0.12 m） |
+| mode=relative | 保留附着瞬间相对位姿（砖可仍在桌上，夹爪不动时看不出「抓起」） |
+| setstatic | **MVP 仅 acknowledge**，未实现真正 static |
+| 砖名必须真实 | 用 `gz model --list` 或 spawn 日志名；错名会 attach 失败 |
+
+**不要**把「夹爪下方偏移」「合爪不产生夹紧力」「代理名 `__held`」当成 bug。
+
+### 7.6 臂控制与后续 Phase
+
+| 约定 | 说明 |
+|------|------|
+| 当前臂控制 | `scaled_joint_trajectory_controller`（ros2_control + gz） |
+| MoveIt | **未接入**；`ur5_lego_motion` 空壳 |
+| 手写 IK | **不迁** `kinematics.py` |
+| YOLO | weights 在 `ur5_lego_vision/weights/`，**节点未实现** |
+| 下一优先 | Phase 3：MoveIt 点到点 → 真值接近 → attach → 抬起 |
+
+### 7.7 资源与运行
+
+| 约定 | 说明 |
+|------|------|
+| 内存 | 主机/WSL 约 **8GB** 级；优先无 RViz、可关 GUI |
+| 改代码后 | `colcon build` + **重启** sim（attach/夹爪插件在进程内） |
+| 推送 | 远程 `origin` = GitHub fork；本地可能 ahead，push 需网络/鉴权 |
+
+---
+
+## 8. 原项目抓取对照
 
 | | ROS1 | 本仓库 ROS2 |
 |--|------|-------------|
-| 合爪 | gripper action | `/gripper_left_cmd` `/gripper_right_cmd` |
+| 合爪 | gripper action | `/gripper_left_cmd` `/gripper_right_cmd`（m） |
 | 粘住 | Classic **fixed joint** 插件 | **static 代理 + set_pose** |
 | 粘着 link | `wrist_3_link` | TF `robotiq_85_base_link` |
 | 放置固定 | attach ground + setstatic | 未完整复刻 |
 
 ---
 
-## 8. 已知风险 / 待办
+## 9. 已知风险 / 待办
 
 | 项 | 说明 |
 |----|------|
@@ -177,21 +280,20 @@ detach: remove 代理 → spawn 动态砖（略低）→ 重力下落
 | MoveIt | 未接；臂仅有 trajectory controller |
 | 真机式固定关节 | Harmonic 无等价 ros 插件；长期可评估 DetachableJoint / 自定义 system |
 | 内存 ~8G | 默认 `launch_rviz:=false`；可 `gazebo_gui:=false` |
-| 未提交改动 | 大量本地修改（attach/夹爪/SDF），尚未 commit/push |
+| snap 观感 | 砖在夹爪下而非指间 = 设计（见 §7.5） |
 
 ---
 
-## 9. 下一步（优先级）
+## 10. 下一步（优先级）
 
 1. **Phase 3**：MoveIt 点到点 → 真值位姿接近 → attach → 抬起  
 2. 可选：放置 setstatic / 固定到桌面  
 3. Phase 4：相机 bridge + YOLO 常驻  
 4. Phase 5：多关卡 / 城堡 / 文档收尾  
-5. 建议 **git commit**（拆：gazebo 资产 / description+夹爪 / attach / docs）
 
 ---
 
-## 10. 变更日志（迁移）
+## 11. 变更日志（迁移）
 
 | 日期 | 内容 |
 |------|------|
@@ -202,10 +304,11 @@ detach: remove 代理 → spawn 动态砖（略低）→ 重力下落
 | 2026-07-24 | Step F：简化夹爪 + gz JointPositionController 开合通过 |
 | 2026-07-24 | Step G：attach MVP；迭代 sticky → static-proxy；砖质量 0.02kg |
 | 2026-07-24 | Phase2 复测通过：`attach_demo --spawn --hold 15` 稳定粘合、detach 下落 |
+| 2026-07-24 | 文档：§7 新对话必读设计约定（夹爪/attach/构建/勿当 bug） |
 
 ---
 
-## 11. 日常命令速查
+## 12. 日常命令速查
 
 ```bash
 source /opt/ros/jazzy/setup.bash

@@ -17,7 +17,9 @@ ROS 2 迁移分支：`ros2-jazzy`
 | 4 | YOLO | 待做 |
 | 5 | 全管道 / 城堡 | 待做 |
 
-完整记录：**[docs/MIGRATION.md](docs/MIGRATION.md)**。
+完整记录：**[docs/MIGRATION.md](docs/MIGRATION.md)**（含 **§7 新对话必读：设计约定**）。
+
+另开对话时请先读 MIGRATION §7，例如：砖在夹爪**下方**是 snap 设计；夹爪单位 **m（0/0.04）**；attach 为 **static 代理粘合** 非摩擦抓取。
 
 ## 快速开始
 
